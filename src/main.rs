@@ -8,12 +8,12 @@ mod point3;
 mod ray;
 
 fn main() {
-    let mut file = BufWriter::new(fs::File::create("Images/redCircleImg(highRes).ppm").unwrap());
+    let mut file = BufWriter::new(fs::File::create("Images/visualisingNormalsImg.ppm").unwrap());
     let mut stderr = std::io::stderr();
 
     //image
     let aspect_ratio = 16.0 / 9.0;
-    let img_width = 800;
+    let img_width = 400;
     let img_height = (img_width as f64 / aspect_ratio) as i32;
 
 
@@ -30,7 +30,7 @@ fn main() {
     //render
     file.write_all(format!("P3\n{} {}\n255\n", img_width, img_height).as_bytes()).expect("couldnt write header");
 
-    let mut counter = 0;
+    let mut counter: i64 = 0;
     for y in (0 .. img_height).rev() {
         // prints how many coloumns of pixels remain
         stderr.write(format!("Scanlines remaining: {}\n", y)
@@ -58,10 +58,12 @@ fn main() {
 
 ///function for making a quick color for the rays
 fn ray_color(r: &Ray) -> Color {
-    if sphere_is_hit(&Point3::from_xyz(0.0, 0.0, -1.0), 0.5, r) {
-        return Color::from_rgb(1.0, 0.0, 0.0).unwrap();
+    let t = sphere_is_hit(&Point3::from_xyz(0.0, 0.0, -1.0), 0.5, &r);
+    if t > 0.0 {
+        let n = (r.at(t) - Point3::from_xyz(0.0, 0.0, -1.0)).unit_vec();
+        return Color::from_rgb((n.x() + 1.0) * 0.5, (n.y() +1.0) * 0.5, (n.z() + 1.0) * 0.5).unwrap();
     }
-    
+
     let unit_vec = r.direction().unit_vec();
     let t = 0.5 * (unit_vec.y() + 1.0);
 
@@ -74,14 +76,18 @@ fn ray_color(r: &Ray) -> Color {
 }
 
 /// function checks if the ray hits a given sphere
-fn sphere_is_hit (sphere_center: &Point3, radius: f64, ray: &Ray) -> bool {
+fn sphere_is_hit (sphere_center: &Point3, radius: f64, ray: &Ray) -> f64 {
     // using quadratic formula to calculate intersections
     let oc = ray.origin() - *sphere_center;
-    let a = ray.direction().dot_product(&ray.direction());
-    let b = 2.0 * oc.dot_product(&ray.direction());
-    let c = oc.dot_product(&oc) - radius * radius;
+    let a = ray.direction().length_squared();
+    let half_b = oc.dot_product(&ray.direction());
+    let c = oc.length_squared() - radius * radius;
 
-    let discriminant = b*b - 4.0*a*c;
+    let discriminant = half_b*half_b - a*c;
 
-    discriminant > 0.0
+    if discriminant < 0.0 {
+        return -1.0;
+    } 
+
+    (-half_b - discriminant.sqrt()) / a
 }
