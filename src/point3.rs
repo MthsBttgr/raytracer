@@ -21,8 +21,8 @@ impl Point3 {
     }
 
     /// Creates a new point at the given xyz coordinates
-    pub fn from_xyz(x: f64, y: f64, z: f64) -> Self {
-        Self { x, y, z }
+    pub fn from_xyz(x: impl Into<f64>, y: impl Into<f64>, z: impl Into<f64>) -> Self {
+        Self { x: x.into(), y: y.into(), z: z.into()}
     }
 
     /// returns x-coordinate
@@ -75,13 +75,6 @@ impl Point3 {
 
     pub fn unit_vec(&self) -> Vec3 {
         *self / self.length()
-    }
-
-    /// returns a string containing the color values of the color.
-    /// The values are scaled by 255.999 and rounded down.
-    /// the string returned looks like this: "{r} {g} {b}", so just the color values and no "\n" or anything
-    pub fn write_color(&self) -> String {
-        format!("{} {} {}", (self.x * 255.999) as i32, (self.y * 255.999) as i32, (self.z * 255.999) as i32)
     }
 }
 
@@ -175,6 +168,12 @@ impl PartialEq for Point3 {
     }
 }
 
+impl Into<Color> for Point3 {
+    fn into(self) -> Color 
+    {
+        Color::from_rgb(self.x, self.y, self.z)
+    }
+}
 
 pub struct Color {
     r: f64,
@@ -204,24 +203,35 @@ impl Color {
         self.b
     }
 
-    /// creates a new color from rgb values
-    /// rgb values must be between 0 and 1, else function returns err
-    pub fn from_rgb(r:f64, g:f64, b:f64) -> Result<Color, ()>{
-        if r.is_between(0.0, 1.0) && g.is_between(0.0, 1.0) && b.is_between(0.0, 1.0){
-            return Ok(Color{
-                r,
-                g,
-                b
-            });
+    /// creates a new color from rgb values.
+    /// The values should be between 0 and 1
+    pub fn from_rgb(r: impl Into<f64>, g: impl Into<f64>, b: impl Into<f64>) -> Color{
+        Color{
+            r: r.into(),
+            g: g.into(),
+            b: b.into()
         }
-        Err(())
     }
 
     /// Returns a string containing the color values of the color.
     /// The values are scaled by 255.999 and rounded down. 
     /// The string returned looks like this: "{r} {g} {b}", so just the color values and no "\n" or anything
-    pub fn write_color(&self) -> String {
-        format!("{} {} {}", (self.r * 255.999) as i32, (self.g * 255.999) as i32, (self.b * 255.999) as i32)
+    pub fn write_color(&self, samples_pr_pixel: f64) -> String {
+
+        let mut r = self.r;
+        let mut g = self.g;
+        let mut b = self.b;
+
+        let scale = 1.0 / samples_pr_pixel;
+
+        r *= scale;
+        g *= scale;
+        b *= scale;
+
+        return format!("{} {} {}", 
+        (256.0 * clamp(r, 0.0, 0.999)) as i32, 
+        (256.0 * clamp(g, 0.0, 0.999)) as i32, 
+        (256.0 * clamp(b, 0.0, 0.999)) as i32);
     }
 }
 
@@ -323,4 +333,11 @@ impl IsBetween for f64 {
     fn is_between(&self, a: f64, b: f64) -> bool {
         a <= *self && *self <= b
     }
+}
+
+#[inline]
+fn clamp(num: f64, min: f64, max: f64) -> f64 {
+    if num < min {return min}
+    if num > max {return max}
+    num
 }
