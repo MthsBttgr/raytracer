@@ -6,6 +6,7 @@ use crate::{Point3, Vec3, Ray};
 pub struct HitRecord {
 	point: Point3,
 	normal: Vec3,
+	
 	t: f64,
 	front_face: bool,
 } 
