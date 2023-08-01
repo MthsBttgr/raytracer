@@ -1,4 +1,5 @@
 use std::ops::{Add, Div, Mul, Neg, Sub};
+use rand::{Rng};
 
 pub type Vec3 = Point3;
 
@@ -73,8 +74,36 @@ impl Point3 {
         )
     }
 
+    /// returns the unitvector
     pub fn unit_vec(&self) -> Vec3 {
         *self / self.length()
+    }
+
+    /// creates a random vec with random values from min to (but not including) max 
+    pub fn random_vec_from_to(min:f64, max:f64) -> Vec3{
+        let mut rng = rand::thread_rng();
+        Self {
+            x: rng.gen_range(min..max),
+            y: rng.gen_range(min..max),
+            z: rng.gen_range(min..max)
+        }
+    }
+
+    pub fn random_vec_in_unit_sphere() -> Vec3 {
+        loop {
+            let p = Vec3::random_vec_from_to(-1.0, 1.0);
+            if p.length_squared() >= 1.0 {continue}
+            return p;
+        }
+    }
+
+    pub fn random_unit_vec() -> Vec3 {
+        Point3::random_vec_in_unit_sphere().unit_vec()
+    }
+
+    pub fn near_zero(&self) -> bool {
+        let num = 1e-10;
+        (self.x < num) && (self.y < num) && (self.z < num)
     }
 }
 
@@ -98,6 +127,18 @@ impl Sub for Point3 {
             x: self.x - other.x(),
             y: self.y - other.y(),
             z: self.z - other.z(),
+        }
+    }
+}
+
+impl Sub<f64> for Point3 {
+    type Output = Point3;
+
+    fn sub(self, other: f64) -> Self {
+        Point3 {
+            x: self.x - other,
+            y: self.y - other,
+            z: self.z - other,
         }
     }
 }
@@ -175,6 +216,7 @@ impl Into<Color> for Point3 {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Color {
     r: f64,
     g: f64,
@@ -229,9 +271,9 @@ impl Color {
         b *= scale;
 
         return format!("{} {} {}", 
-        (256.0 * clamp(r, 0.0, 0.999)) as i32, 
-        (256.0 * clamp(g, 0.0, 0.999)) as i32, 
-        (256.0 * clamp(b, 0.0, 0.999)) as i32);
+        (256.0 * clamp(r.sqrt(), 0.0, 0.999)) as i32, 
+        (256.0 * clamp(g.sqrt(), 0.0, 0.999)) as i32, 
+        (256.0 * clamp(b.sqrt(), 0.0, 0.999)) as i32);
     }
 }
 

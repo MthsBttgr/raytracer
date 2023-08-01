@@ -1,25 +1,28 @@
 use crate::point3::Point3;
 use crate::ray::Ray;
 use crate::hitable::{Hitable, HitRecord};
+use crate::material::Material;
 
 /// Struct for a sphere
-#[derive(Default, Copy, Clone, Debug)]
-pub struct Sphere {
+//#[derive(Default, Clone)]
+pub struct Sphere<M: Material> {
 	center: Point3,
 	radius: f64,
+	material: M
 }
 
-impl Sphere {
-	pub fn from_center_and_radius(center: Point3, radius: impl Into<f64>) -> Self {
+impl <M: Material> Sphere<M>  {
+	pub fn from_center_radius_material(center: Point3, radius: impl Into<f64>, material: M) -> Self {
 		Sphere {
 			center,
-			radius: radius.into()
+			radius: radius.into(),
+			material
 		}
 	}
 }
 
-impl Hitable for Sphere {
-	fn hit(&self, r: &Ray, t_min: f64, t_max: f64, record: &mut HitRecord) -> bool {
+impl<M: Material> Hitable for Sphere<M> {
+	fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
 		// using quadratic formula to calculate intersections
 		let oc = r.origin() - self.center;
 		let a = r.direction().length_squared();
@@ -28,7 +31,7 @@ impl Hitable for Sphere {
 	
 		let discriminant = half_b*half_b - a*c;
 
-		if discriminant < 0.0 { return false;}
+		if discriminant < 0.0 { return None;}
 
 		// calculates the sqrt once, and saves the value
 		let discriminant_sqrt = discriminant.sqrt();
@@ -37,18 +40,17 @@ impl Hitable for Sphere {
 		let hit = (-half_b - discriminant_sqrt) / a;
 
 		if hit < t_min || t_max < hit {
-			// adding the sqrt is always closer, since the camera is in the positive z-direction compared to the object
+			// adding the sqrt is always further away
 			let hit = (-half_b + discriminant_sqrt) / a;
 			if hit < t_min || t_max < hit {
-				return false;
+				return None;
 			}
 		}
 
-		record.mut_t(hit);
-		record.mut_point(r.at(hit));
+		let mut record = HitRecord::new(r.at(hit), hit, &self.material);
 		let outward_normal = (record.point() - self.center) / self.radius;
 		record.set_face_normal(r, outward_normal);
 
-		return true;
+		Some(record)
 	}
 }
