@@ -10,19 +10,17 @@ pub struct HitRecord<'a> {
     point: Point3,
     normal: Vec3,
     t: f64,
-    front_face: bool,
     material: &'a dyn Material,
 }
 
 impl<'a> HitRecord<'a> {
     /// creates a new hitrecord. Takes a Point, a value t (the scalar for ray that hit the point), and the material
     /// two other values, front_face and normal, still need to be set, with the function set_face_normal()
-    pub fn new(point: Point3, t: f64, material: &'a dyn Material) -> Self {
+    pub fn new(point: Point3, t: f64, normal: Vec3, material: &'a dyn Material) -> Self {
         Self {
             point,
-            normal: Point3::new(),
             t,
-            front_face: false,
+            normal,
             material,
         }
     }
@@ -41,15 +39,6 @@ impl<'a> HitRecord<'a> {
 
     pub fn t(&self) -> f64 {
         self.t
-    }
-
-    pub fn set_face_normal(&mut self, r: &Ray, outward_normal: Vec3) {
-        self.front_face = r.direction().dot_product(&outward_normal) < 0.0;
-        self.normal = if self.front_face {
-            outward_normal
-        } else {
-            -outward_normal
-        };
     }
 }
 
