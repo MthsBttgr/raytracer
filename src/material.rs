@@ -14,6 +14,7 @@ fn reflect(v_in: &Vec3, normal: &Vec3) -> Vec3 {
     *v_in - *normal * v_in.dot_product(normal) * 2.0
 }
 
+/// Material for diffuse objects. Simply scatters the light
 #[derive(Clone, Copy)]
 pub struct Lambertian {
     albedo: Color,
@@ -44,6 +45,7 @@ impl Material for Lambertian {
     }
 }
 
+/// Material for metal-like objects that reflect like
 #[derive(Clone, Copy)]
 pub struct Metal {
     albedo: Color,
@@ -81,6 +83,7 @@ impl Material for Metal {
     }
 }
 
+/// Material for glass-like objects, where light can enter the object with an index of refraction
 #[derive(Clone, Copy)]
 pub struct Dielectric {
     index_of_refraction: f64,
@@ -106,7 +109,8 @@ impl Material for Dielectric {
             (rec.normal(), 1.0 / self.index_of_refraction)
         };
 
-        let scattered = if let Some(refracted) = refract(&r, &normal, refraction_ratio) {
+        let scattered = if let Some(refracted) = Dielectric::refract(&r, &normal, refraction_ratio)
+        {
             Ray::new(rec.point(), refracted)
         } else {
             let reflected = reflect(&r.direction(), &rec.normal());
@@ -117,25 +121,31 @@ impl Material for Dielectric {
     }
 }
 
-fn refract(r: &Ray, n: &Vec3, refraction_ratio: f64) -> Option<Vec3> {
-    let cos_theta = n.dot_product(&-r.direction().unit_vec()).min(1.0);
-    let sin_theta = (1.0 - cos_theta.powi(2)).sqrt();
+impl Dielectric {
+    /// Function that calculates the refraction of the ray, IF the ray refracts.
+    /// Else function returns None
+    fn refract(r: &Ray, n: &Vec3, refraction_ratio: f64) -> Option<Vec3> {
+        let cos_theta = n.dot_product(&-r.direction().unit_vec()).min(1.0);
+        let sin_theta = (1.0 - cos_theta.powi(2)).sqrt();
 
-    let uv = r.direction().unit_vec();
+        let uv = r.direction().unit_vec();
 
-    // checks if the ball can refract, and returns None if it cant
-    if sin_theta * refraction_ratio > 1.0 || reflectance(cos_theta, refraction_ratio) {
-        return None;
-    } else {
-        let r_out_perp = (uv + *n * cos_theta) * refraction_ratio;
-        let r_out_par = *n * -(1.0 - r_out_perp.length_squared()).abs().sqrt();
-        return Some(r_out_perp + r_out_par);
+        // checks if the ball can refract, and returns None if it cant
+        if sin_theta * refraction_ratio > 1.0
+            || Dielectric::reflectance(cos_theta, refraction_ratio)
+        {
+            return None;
+        } else {
+            let r_out_perp = (uv + *n * cos_theta) * refraction_ratio;
+            let r_out_par = *n * -(1.0 - r_out_perp.length_squared()).abs().sqrt();
+            return Some(r_out_perp + r_out_par);
+        }
     }
-}
 
-/// uses Schlicks approximation to figure out whether or not an object should reflect
-fn reflectance(cosine: f64, refraction_ratio: f64) -> bool {
-    let mut r0 = (1.0 - refraction_ratio) / (1.0 + refraction_ratio);
-    r0 = r0.powi(2);
-    return r0 + (1.0 - r0) * (1.0 - cosine).powi(5) > thread_rng().gen();
+    /// uses Schlicks approximation to figure out whether or not an object should reflect
+    fn reflectance(cosine: f64, refraction_ratio: f64) -> bool {
+        let mut r0 = (1.0 - refraction_ratio) / (1.0 + refraction_ratio);
+        r0 = r0.powi(2);
+        return r0 + (1.0 - r0) * (1.0 - cosine).powi(5) > thread_rng().gen();
+    }
 }

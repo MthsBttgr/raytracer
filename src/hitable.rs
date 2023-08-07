@@ -25,18 +25,22 @@ impl<'a> HitRecord<'a> {
         }
     }
 
+    /// returns a refrence to the objects material
     pub fn material(&self) -> &dyn Material {
         self.material
     }
 
+    /// returns a refrence to the point of object - ray intersection
     pub fn point(&self) -> Point3 {
         self.point
     }
 
+    /// returns a refrence to normal
     pub fn normal(&self) -> Vec3 {
         self.normal
     }
 
+    /// returns a refrence to the parameter used in the linear function to calculate intersections
     pub fn t(&self) -> f64 {
         self.t
     }
@@ -48,16 +52,19 @@ pub struct HitableList {
 }
 
 impl HitableList {
+    /// Add an object to the scene to be rendered
     pub fn add(&mut self, object: Box<dyn Hitable>) {
         self.list.push(object);
     }
 
+    /// clear the list of objects to be rendered
     pub fn clear(&mut self) {
         self.list.clear();
     }
 }
 
 impl Hitable for HitableList {
+    /// Checks if the given ray hits any objects in the scene and returns the record of said hit
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         let mut temp_rec = None;
         let mut closest_so_far = t_max;
