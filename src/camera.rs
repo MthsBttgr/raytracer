@@ -1,10 +1,10 @@
 use std::{
-    f64::INFINITY,
+    f64::{consts::PI, INFINITY},
     fs::File,
     io::{BufWriter, Write},
 };
 
-use rand::Rng;
+use rand::{rngs::ThreadRng, Rng};
 
 use crate::{
     hitable::Hitable,
@@ -14,12 +14,21 @@ use crate::{
 
 pub struct Camera {
     origin: Point3,
-    horizontal: Vec3,
-    vertical: Vec3,
-    lower_left_corner: Point3,
 
     samples_pr_pixel: i64,
-    max_depth: i32,
+    max_depth: i32, // The max amount of ray bounces in the scene
+
+    vfov: f64, // the vertical field of view (stored in radians)
+    vup: Vec3, // Camera-relative up direction
+    look_from: Point3,
+    look_at: Point3,
+    u: Vec3,
+    v: Vec3,
+    w: Vec3,
+
+    pixel_delta_u: Vec3,
+    pixel_delta_v: Vec3,
+    pixel_00_loc: Vec3,
 
     img_width: i64,
     img_height: i64,
@@ -29,43 +38,75 @@ pub struct Camera {
 
 impl Default for Camera {
     fn default() -> Self {
-        let aspect_ratio = 16.0 / 9.0;
-        let viewport_height = 2.0;
-        let viewport_width = viewport_height * aspect_ratio;
-        let focal_length = 1.0;
+        // Camera positioning
+        let look_from = Point3::from_xyz(0, 0, -1);
+        let look_at = Point3::from_xyz(0, 0, 0);
+        let vup = Vec3::from_xyz(0, 1, 0); // Camera - relative up direction
 
-        let samples_pr_pixel = 50;
-        let max_depth = 50;
+        // Camera basic vectors
+        let w = (look_from - look_at).unit_vec();
+        let u = vup.cross_product(&w).unit_vec();
+        let v = w.cross_product(&u);
+
+        // image dimensions
+        let aspect_ratio = 16.0 / 9.0;
         let img_width = 400;
         let img_height = (img_width as f64 / aspect_ratio) as i64;
 
-        let origin = Point3::new();
-        let horizontal = Vec3::from_xyz(viewport_width, 0.0, 0.0);
-        let vertical = Vec3::from_xyz(0.0, viewport_height, 0.0);
-        let lower_left_corner =
-            origin - horizontal / 2.0 - vertical / 2.0 - Vec3::from_xyz(0.0, 0.0, focal_length);
+        // Viewport dimensions:
+        let focal_length = (look_from - look_at).length();
+        let vfov = 90.0;
+        let theta = Camera::degrees_to_radians(vfov);
+        let h = (theta / 2.0).tan();
+        let viewport_height = 2.0 * h * focal_length;
+        let viewport_width = viewport_height * aspect_ratio;
+
+        let viewport_u = u * viewport_width;
+        let viewport_v = -v * viewport_height;
+        let pixel_delta_u = viewport_u / img_width as f64;
+        let pixel_delta_v = viewport_v / img_height as f64;
+        let upper_left = look_from - (w * focal_length) - viewport_u / 2.0 - viewport_v / 2.0;
+        let pixel_00_loc = upper_left + (pixel_delta_v + pixel_delta_u) * 0.5;
+
+        // Usefull vectors
+        let origin = look_from;
+
+        // Render settings
+        let samples_pr_pixel = 50;
+        let max_depth = 50;
 
         Self {
             origin,
-            horizontal,
-            vertical,
-            lower_left_corner,
             samples_pr_pixel,
             max_depth,
             img_width,
             img_height,
             focal_length,
             aspect_ratio,
+            vfov,
+            vup,
+            look_from,
+            look_at,
+            v,
+            u,
+            w,
+            pixel_delta_u,
+            pixel_delta_v,
+            pixel_00_loc,
         }
     }
 }
 
 impl Camera {
-    pub fn get_ray(&self, u: f64, v: f64) -> Ray {
-        Ray::new(
-            self.origin,
-            self.lower_left_corner + self.horizontal * u + self.vertical * v - self.origin,
-        )
+    fn degrees_to_radians(degrees: f64) -> f64 {
+        degrees * PI / 180.0
+    }
+
+    pub fn get_ray(&self, x: f64, y: f64, rng: &mut ThreadRng) -> Ray {
+        let pixel_center = self.pixel_00_loc
+            + self.pixel_delta_u * (x + rng.gen::<f64>())
+            + self.pixel_delta_v * (y + rng.gen::<f64>());
+        Ray::new(self.origin, pixel_center - self.origin)
     }
 
     pub fn render<T: Hitable>(&self, world: &T, file: &mut BufWriter<File>) {
@@ -78,10 +119,10 @@ impl Camera {
             .expect("couldnt write header");
 
         let mut counter: i64 = 0;
-        for y in (0..self.img_height).rev() {
+        for y in 0..self.img_height {
             // prints how many coloumns of pixels remain
             stderr
-                .write(format!("Scanlines remaining: {}\n", y).as_bytes())
+                .write(format!("Scanlines remaining: {}\n", self.img_height - y).as_bytes())
                 .expect("cant write to stderr");
             stderr.flush().expect("couldnt flush stderr");
 
@@ -89,10 +130,7 @@ impl Camera {
                 let mut pixel_color = Color::new();
 
                 for _s in 0..self.samples_pr_pixel {
-                    let u = (x as f64 + rng.gen_range(-1.0..1.0)) / ((self.img_width - 1) as f64);
-                    let v = (y as f64 + rng.gen_range(-1.0..1.0)) / ((self.img_height - 1) as f64);
-
-                    let r = self.get_ray(u, v);
+                    let r = self.get_ray(x as f64, y as f64, &mut rng);
                     pixel_color = pixel_color + Camera::ray_color(&r, world, self.max_depth);
 
                     counter += 1;
