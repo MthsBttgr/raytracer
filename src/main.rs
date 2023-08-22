@@ -32,14 +32,24 @@ fn main() {
 
     let val = (PI / 4.0).cos();
     world.add(Box::new(Sphere::from_center_radius_material(
-        Point3::from_xyz(-val, 0, -1),
-        val,
-        ground_material,
+        Point3::from_xyz(0, 0, -1),
+        0.5,
+        center_material,
     )));
     world.add(Box::new(Sphere::from_center_radius_material(
-        Point3::from_xyz(val, 0, -1),
-        val,
-        center_material,
+        Point3::from_xyz(-1, 0, -1),
+        0.5,
+        left_material,
+    )));
+    world.add(Box::new(Sphere::from_center_radius_material(
+        Point3::from_xyz(-1, 0, -1),
+        -0.4,
+        left_material,
+    )));
+    world.add(Box::new(Sphere::from_center_radius_material(
+        Point3::from_xyz(1, 0, -1),
+        0.5,
+        right_material,
     )));
     world.add(Box::new(Sphere::from_center_radius_material(
         Point3::from_xyz(0, -100.5, -1),
@@ -50,5 +60,12 @@ fn main() {
     //3D camera
     let mut camera = Camera::default();
     camera.set_img_dimensions(16.0 / 9.0, 400);
+    camera.set_camera_settings(
+        Point3::from_xyz(-2, 2, 1),
+        Point3::from_xyz(0, 0, -1),
+        20.0,
+        50,
+        50,
+    );
     camera.render(&world, &mut file);
 }
