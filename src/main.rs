@@ -18,9 +18,8 @@ use sphere::Sphere;
 use crate::material::{Dielectric, Lambertian, Metal};
 
 fn main() {
-    let mut file = BufWriter::new(
-        fs::File::create("Images/testWithNewCameraStruct.ppm").expect("couldn't create file"),
-    );
+    let mut file =
+        BufWriter::new(fs::File::create("Images/testWithFocus.ppm").expect("couldn't create file"));
 
     //world
     let mut world = HitableList::default();
@@ -66,6 +65,8 @@ fn main() {
         20.0,
         50,
         50,
+        10.0,
+        3.4,
     );
     camera.render(&world, &mut file);
 }

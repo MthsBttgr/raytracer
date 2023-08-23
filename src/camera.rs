@@ -4,7 +4,7 @@ use std::{
     io::{BufWriter, Write},
 };
 
-use rand::{rngs::ThreadRng, Rng};
+use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 use crate::{
     hitable::Hitable,
@@ -34,6 +34,11 @@ pub struct Camera {
     img_height: i64,
     aspect_ratio: f64,
     focal_length: f64,
+
+    focus_distance: f64,
+    defocus_angle: f64,
+    defocus_disk_u: Vec3,
+    defocus_disk_v: Vec3,
 }
 
 impl Default for Camera {
@@ -48,24 +53,31 @@ impl Default for Camera {
         let u = vup.cross_product(&w).unit_vec();
         let v = w.cross_product(&u);
 
+        let focus_distance = 10.0;
+        let defocus_angle = 0.0;
+
+        let defocus_radius = focus_distance * Camera::degrees_to_radians(defocus_angle / 2.0).tan();
+        let defocus_disk_u = u * defocus_radius;
+        let defocus_disk_v = v * defocus_radius;
+
         // image dimensions
         let aspect_ratio = 16.0 / 9.0;
         let img_width = 400;
         let img_height = (img_width as f64 / aspect_ratio) as i64;
 
         // Viewport dimensions:
-        let focal_length = (look_from - look_at).length();
+        // let focal_length = (look_from - look_at).length();
         let vfov = 90.0;
         let theta = Camera::degrees_to_radians(vfov);
         let h = (theta / 2.0).tan();
-        let viewport_height = 2.0 * h * focal_length;
+        let viewport_height = 2.0 * h * focus_distance;
         let viewport_width = viewport_height * aspect_ratio;
 
         let viewport_u = u * viewport_width;
         let viewport_v = -v * viewport_height;
         let pixel_delta_u = viewport_u / img_width as f64;
         let pixel_delta_v = viewport_v / img_height as f64;
-        let upper_left = look_from - (w * focal_length) - viewport_u / 2.0 - viewport_v / 2.0;
+        let upper_left = look_from - (w * focus_distance) - viewport_u / 2.0 - viewport_v / 2.0;
         let pixel_00_loc = upper_left + (pixel_delta_v + pixel_delta_u) * 0.5;
 
         // Usefull vectors
@@ -81,7 +93,7 @@ impl Default for Camera {
             max_light_bounces: max_depth,
             img_width,
             img_height,
-            focal_length,
+            focal_length: 1.0,
             aspect_ratio,
             vfov,
             vup,
@@ -93,6 +105,10 @@ impl Default for Camera {
             pixel_delta_u,
             pixel_delta_v,
             pixel_00_loc,
+            focus_distance,
+            defocus_angle,
+            defocus_disk_u,
+            defocus_disk_v,
         }
     }
 }
@@ -106,7 +122,20 @@ impl Camera {
         let pixel_center = self.pixel_00_loc
             + self.pixel_delta_u * (x + rng.gen::<f64>())
             + self.pixel_delta_v * (y + rng.gen::<f64>());
-        Ray::new(self.origin, pixel_center - self.origin)
+
+        let ray_origin = if self.defocus_angle <= 0.0 {
+            self.origin
+        } else {
+            self.defocus_disk_sample(rng)
+        };
+
+        Ray::new(ray_origin, pixel_center - ray_origin)
+    }
+
+    fn defocus_disk_sample(&self, rng: &mut ThreadRng) -> Point3 {
+        let p = Point3::random_in_unit_circle(rng);
+
+        return self.origin + (self.defocus_disk_u * p.x()) + (self.defocus_disk_v * p.y());
     }
 
     ///function for making a quick color for the rays
@@ -179,23 +208,32 @@ impl Camera {
         vfov: f64,
         max_light_bounces: i32,
         samples: i64,
+        defocus_angle: f64,
+        focus_distance: f64,
     ) {
         self.origin = camera_placement;
         self.look_from = camera_placement;
         self.look_at = look_at;
-        self.focal_length = (self.origin - self.look_at).length();
+        // self.focal_length = (self.origin - self.look_at).length();
         self.vfov = vfov;
         self.samples_pr_pixel = samples;
         self.max_light_bounces = max_light_bounces;
+        self.focus_distance = focus_distance;
+        self.defocus_angle = defocus_angle;
 
         // Camera basic vectors
         self.w = (self.look_from - self.look_at).unit_vec();
         self.u = self.vup.cross_product(&self.w).unit_vec();
         self.v = self.w.cross_product(&self.u);
 
+        let defocus_radius =
+            self.focus_distance * Camera::degrees_to_radians(self.defocus_angle / 2.0).tan();
+        self.defocus_disk_u = self.u * defocus_radius;
+        self.defocus_disk_v = self.v * defocus_radius;
+
         // Viewport dimensions:
         let h = (Camera::degrees_to_radians(self.vfov) / 2.0).tan();
-        let viewport_height = 2.0 * h * self.focal_length;
+        let viewport_height = 2.0 * h * self.focus_distance;
         let viewport_width = viewport_height * self.aspect_ratio;
 
         let viewport_u = self.u * viewport_width;
@@ -203,7 +241,7 @@ impl Camera {
         self.pixel_delta_u = viewport_u / self.img_width as f64;
         self.pixel_delta_v = viewport_v / self.img_height as f64;
         let upper_left =
-            self.look_from - (self.w * self.focal_length) - viewport_u / 2.0 - viewport_v / 2.0;
+            self.look_from - (self.w * self.focus_distance) - viewport_u / 2.0 - viewport_v / 2.0;
         self.pixel_00_loc = upper_left + (self.pixel_delta_v + self.pixel_delta_u) * 0.5;
     }
 
