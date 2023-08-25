@@ -1,10 +1,11 @@
+use rand::{rngs::ThreadRng, Rng};
+use rayon::prelude::*;
 use std::{
     f64::{consts::PI, INFINITY},
     fs::File,
     io::{BufWriter, Write},
+    sync::Arc,
 };
-
-use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 use crate::{
     hitable::Hitable,
@@ -33,7 +34,6 @@ pub struct Camera {
     img_width: i64,
     img_height: i64,
     aspect_ratio: f64,
-    focal_length: f64,
 
     focus_distance: f64,
     defocus_angle: f64,
@@ -93,7 +93,6 @@ impl Default for Camera {
             max_light_bounces: max_depth,
             img_width,
             img_height,
-            focal_length: 1.0,
             aspect_ratio,
             vfov,
             vup,
@@ -114,6 +113,12 @@ impl Default for Camera {
 }
 
 impl Camera {
+    fn defocus_disk_sample(&self, rng: &mut ThreadRng) -> Point3 {
+        let p = Point3::random_in_unit_circle(rng);
+
+        return self.origin + (self.defocus_disk_u * p.x()) + (self.defocus_disk_v * p.y());
+    }
+
     fn degrees_to_radians(degrees: f64) -> f64 {
         degrees * PI / 180.0
     }
@@ -132,10 +137,65 @@ impl Camera {
         Ray::new(ray_origin, pixel_center - ray_origin)
     }
 
-    fn defocus_disk_sample(&self, rng: &mut ThreadRng) -> Point3 {
-        let p = Point3::random_in_unit_circle(rng);
+    ///function for making a quick color for the rays
+    pub fn par_ray_color<T: Hitable>(r: &Ray, world: Arc<T>, depth: i32) -> Color {
+        // If we've exceeded the ray bounce limit, no more light is gathered.
+        if depth <= 0 {
+            return Color::new();
+        }
 
-        return self.origin + (self.defocus_disk_u * p.x()) + (self.defocus_disk_v * p.y());
+        // let world = **world.lock().unwrap();
+        if let Some(rec) = world.hit(r, 0.00001, INFINITY) {
+            if let Some((scattered, attenuation)) = rec.material().scatter(r, &rec) {
+                return attenuation * Camera::par_ray_color(&scattered, world.clone(), depth - 1);
+            }
+
+            return Color::new();
+        }
+
+        let unit_vec = r.direction().unit_vec();
+        let t = 0.5 * (unit_vec.y() + 1.0);
+
+        return Color::from_rgb(1, 1, 1) * (1.0 - t) + Color::from_rgb(0.5, 0.7, 1.0) * t;
+    }
+
+    pub fn par_render<T: Hitable + std::marker::Sync + std::marker::Send>(
+        &self,
+        world: &Arc<T>,
+        file: &mut BufWriter<File>,
+    ) {
+        //render
+        file.write_all(format!("P3\n{} {}\n255\n", self.img_width, self.img_height).as_bytes())
+            .expect("couldnt write header");
+
+        let final_vec = (0..self.img_height)
+            .into_par_iter()
+            .flat_map(|y| {
+                (0..self.img_width)
+                    .into_par_iter()
+                    .map(|x| {
+                        let mut pixel_color = Color::new();
+                        let mut rng = rand::thread_rng();
+
+                        // let world = **world.lock().unwrap();
+
+                        for _s in 0..self.samples_pr_pixel {
+                            let r = self.get_ray(x as f64, y as f64, &mut rng);
+                            pixel_color = pixel_color
+                                + Camera::par_ray_color(&r, world.clone(), self.max_light_bounces);
+                        }
+                        pixel_color
+                    })
+                    .collect::<Vec<Color>>()
+            })
+            .collect::<Vec<Color>>();
+
+        for col in final_vec {
+            file.write_all(
+                format!("\n{}", col.write_color(self.samples_pr_pixel as f64)).as_bytes(),
+            )
+            .expect("couldnt write all");
+        }
     }
 
     ///function for making a quick color for the rays
