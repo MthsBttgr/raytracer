@@ -93,6 +93,7 @@ impl Point3 {
         }
     }
 
+    /// Gets a random vec inside a sphere with the radius of one
     pub fn random_vec_in_unit_sphere() -> Vec3 {
         loop {
             let p = Vec3::random_vec_from_to(-1.0, 1.0);
@@ -103,15 +104,18 @@ impl Point3 {
         }
     }
 
+    /// Gets a random unit vector
     pub fn random_unit_vec() -> Vec3 {
         Point3::random_vec_in_unit_sphere().unit_vec()
     }
 
+    /// Checks if Self is close to a null vec
     pub fn near_zero(&self) -> bool {
         let num = 1e-10;
         (self.x < num) && (self.y < num) && (self.z < num)
     }
 
+    /// Generates a random 2 dimensional vector (z = 0) with a lenght less than one
     pub fn random_in_unit_circle(rng: &mut ThreadRng) -> Vec3 {
         loop {
             let p = Vec3::from_xyz(rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0), 0);

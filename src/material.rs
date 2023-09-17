@@ -75,7 +75,7 @@ impl Material for Lambertian {
     }
 }
 
-/// Material for metal-like objects that reflect like
+/// Material for metal-like objects that reflect light
 #[derive(Clone, Copy)]
 pub struct Metal {
     albedo: Color,

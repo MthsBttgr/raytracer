@@ -13,27 +13,28 @@ use crate::{
     ray::Ray,
 };
 
+/// The virtual camera
 pub struct Camera {
-    origin: Point3,
-
-    samples_pr_pixel: i64,
+    samples_pr_pixel: i64,  // The amount of rays sent out pr pixel
     max_light_bounces: i32, // The max amount of ray bounces in the scene
 
-    vfov: f64, // the vertical field of view (stored in radians)
-    vup: Vec3, // Camera-relative up direction
-    look_from: Point3,
-    look_at: Point3,
+    vfov: f64,         // the vertical field of view (stored in radians)
+    vup: Vec3,         // Camera-relative up direction
+    look_from: Point3, // Where the camera is looking from
+    look_at: Point3,   // where the camera is looking at
+
+    // Vectors that define camera dimensions
     u: Vec3,
     v: Vec3,
     w: Vec3,
 
-    pixel_delta_u: Vec3,
-    pixel_delta_v: Vec3,
-    pixel_00_loc: Vec3,
+    pixel_delta_u: Vec3, // The distance between horizontal pixels
+    pixel_delta_v: Vec3, // THe distance betweem vertical pixels
+    pixel_00_loc: Vec3,  // the location of the top left pixel of the camera
 
-    img_width: i64,
-    img_height: i64,
-    aspect_ratio: f64,
+    img_width: i64,    // The width of the image in pixels
+    img_height: i64,   // The height of the image in pixels
+    aspect_ratio: f64, // The ratio between the height and width of the image
 
     focus_distance: f64,
     defocus_angle: f64,
@@ -66,7 +67,6 @@ impl Default for Camera {
         let img_height = (img_width as f64 / aspect_ratio) as i64;
 
         // Viewport dimensions:
-        // let focal_length = (look_from - look_at).length();
         let vfov = 90.0;
         let theta = Camera::degrees_to_radians(vfov);
         let h = (theta / 2.0).tan();
@@ -80,15 +80,11 @@ impl Default for Camera {
         let upper_left = look_from - (w * focus_distance) - viewport_u / 2.0 - viewport_v / 2.0;
         let pixel_00_loc = upper_left + (pixel_delta_v + pixel_delta_u) * 0.5;
 
-        // Usefull vectors
-        let origin = look_from;
-
         // Render settings
         let samples_pr_pixel = 50;
         let max_depth = 50;
 
         Self {
-            origin,
             samples_pr_pixel,
             max_light_bounces: max_depth,
             img_width,
@@ -116,7 +112,7 @@ impl Camera {
     fn defocus_disk_sample(&self, rng: &mut ThreadRng) -> Point3 {
         let p = Point3::random_in_unit_circle(rng);
 
-        return self.origin + (self.defocus_disk_u * p.x()) + (self.defocus_disk_v * p.y());
+        return self.look_from + (self.defocus_disk_u * p.x()) + (self.defocus_disk_v * p.y());
     }
 
     fn degrees_to_radians(degrees: f64) -> f64 {
@@ -129,7 +125,7 @@ impl Camera {
             + self.pixel_delta_v * (y + rng.gen::<f64>());
 
         let ray_origin = if self.defocus_angle <= 0.0 {
-            self.origin
+            self.look_from
         } else {
             self.defocus_disk_sample(rng)
         };
@@ -159,15 +155,17 @@ impl Camera {
         return Color::from_rgb(1, 1, 1) * (1.0 - t) + Color::from_rgb(0.5, 0.7, 1.0) * t;
     }
 
+    /// Render the final inage in parrallel using rayon
     pub fn par_render<T: Hitable + std::marker::Sync + std::marker::Send>(
         &self,
         world: &Arc<T>,
         file: &mut BufWriter<File>,
     ) {
-        //render
+        // First write the header for the image file
         file.write_all(format!("P3\n{} {}\n255\n", self.img_width, self.img_height).as_bytes())
             .expect("couldnt write header");
 
+        //render
         let final_vec = (0..self.img_height)
             .into_par_iter()
             .flat_map(|y| {
@@ -176,8 +174,6 @@ impl Camera {
                     .map(|x| {
                         let mut pixel_color = Color::new();
                         let mut rng = rand::thread_rng();
-
-                        // let world = **world.lock().unwrap();
 
                         for _s in 0..self.samples_pr_pixel {
                             let r = self.get_ray(x as f64, y as f64, &mut rng);
@@ -190,6 +186,7 @@ impl Camera {
             })
             .collect::<Vec<Color>>();
 
+        // write to file
         for col in final_vec {
             file.write_all(
                 format!("\n{}", col.write_color(self.samples_pr_pixel as f64)).as_bytes(),
@@ -219,6 +216,7 @@ impl Camera {
         return Color::from_rgb(1, 1, 1) * (1.0 - t) + Color::from_rgb(0.5, 0.7, 1.0) * t;
     }
 
+    /// Render the image without parallelisation
     pub fn render<T: Hitable>(&self, world: &T, file: &mut BufWriter<File>) {
         let mut stderr = std::io::stderr();
 
@@ -261,6 +259,8 @@ impl Camera {
         println!("for loop ran: {} times", counter);
     }
 
+    /// Set camera settings that aren't the default values
+    // Should probably have use a builder pattern or something, but this was just faster...
     pub fn set_camera_settings(
         &mut self,
         camera_placement: Point3,
@@ -271,10 +271,8 @@ impl Camera {
         defocus_angle: f64,
         focus_distance: f64,
     ) {
-        self.origin = camera_placement;
         self.look_from = camera_placement;
         self.look_at = look_at;
-        // self.focal_length = (self.origin - self.look_at).length();
         self.vfov = vfov;
         self.samples_pr_pixel = samples;
         self.max_light_bounces = max_light_bounces;

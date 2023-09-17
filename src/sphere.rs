@@ -4,7 +4,6 @@ use crate::point3::Point3;
 use crate::ray::Ray;
 
 /// Struct for a sphere
-//#[derive(Default, Clone)]
 pub struct Sphere<M: Material> {
     center: Point3,
     radius: f64,
@@ -12,6 +11,7 @@ pub struct Sphere<M: Material> {
 }
 
 impl<M: Material> Sphere<M> {
+    /// Construct a sphere from the center position, it's radius, and it's material
     pub fn from_center_radius_material(
         center: Point3,
         radius: impl Into<f64>,
@@ -26,6 +26,8 @@ impl<M: Material> Sphere<M> {
 }
 
 impl<M: Material> Hitable for Sphere<M> {
+    /// Calculates if a ray hits the sphere, and returns a hitrecord if it is hit.
+    /// Else it returns none.
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         // using quadratic formula to calculate intersections
         let oc = r.origin() - self.center;
@@ -44,7 +46,6 @@ impl<M: Material> Hitable for Sphere<M> {
 
         // detect the nearest hit:
         let mut hit = (-half_b - discriminant_sqrt) / a;
-
         if hit <= t_min || t_max <= hit {
             // adding the sqrt is always further away
             hit = (-half_b + discriminant_sqrt) / a;
@@ -53,6 +54,7 @@ impl<M: Material> Hitable for Sphere<M> {
             }
         }
 
+        // Constructs the hitrecord
         let point = r.at(hit);
         let record = HitRecord::new(
             point,
