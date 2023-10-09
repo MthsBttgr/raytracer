@@ -116,11 +116,11 @@ fn main() {
         };
     }
 
-    println!("starting normal render");
-    let instant = std::time::Instant::now();
-    CAMERA.render(&world, &mut file1);
-    let time = instant.elapsed();
-    println!("Time taken: {:#?}", time);
+    // println!("starting normal render");
+    // let instant = std::time::Instant::now();
+    // CAMERA.render(&world, &mut file1);
+    // let time = instant.elapsed();
+    // println!("Time taken: {:#?}", time);
 
     println!("starting render with threads");
     let instant = std::time::Instant::now();

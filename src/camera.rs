@@ -143,9 +143,9 @@ impl Camera {
         }
 
         // let world = **world.lock().unwrap();
-        if let Some(rec) = world.hit(r, 0.00001, INFINITY) {
+        if let Some(rec) = world.hit(r, 0.001, INFINITY) {
             if let Some((scattered, attenuation)) = rec.material().scatter(r, &rec) {
-                return attenuation * Camera::par_ray_color(&scattered, world.clone(), depth - 1);
+                return attenuation * Camera::par_ray_color(&scattered, world, depth - 1);
             }
 
             return Color::new();

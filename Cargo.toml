@@ -10,5 +10,5 @@ lazy_static = "1.4.0"
 rand = "0.8.5"
 rayon = "1.7.0"
 
-[profile.release]
-debug = true
+# [profile.release]
+# debug = true
