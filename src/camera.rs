@@ -4,7 +4,7 @@ use std::{
     f64::{consts::PI, INFINITY},
     fs::File,
     io::{BufWriter, Write},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 use crate::{
@@ -41,6 +41,8 @@ pub struct Camera {
     defocus_disk_u: Vec3,
     defocus_disk_v: Vec3,
 }
+
+impl Camera {}
 
 impl Default for Camera {
     fn default() -> Self {
@@ -155,39 +157,90 @@ impl Camera {
         return Color::from_rgb(1, 1, 1) * (1.0 - t) + Color::from_rgb(0.5, 0.7, 1.0) * t;
     }
 
-    /// Render the final inage in parrallel using rayon
-    pub fn par_render<T: Hitable + std::marker::Sync + std::marker::Send>(
-        &self,
-        world: &Arc<T>,
-        file: &mut BufWriter<File>,
+    ///Render the image in parallel with threads
+    pub fn render_with_threads<'a, T: Hitable + 'static>(
+        &'static self,
+        world: Arc<T>,
+        file: &'a mut BufWriter<File>,
     ) {
         // First write the header for the image file
         file.write_all(format!("P3\n{} {}\n255\n", self.img_width, self.img_height).as_bytes())
             .expect("couldnt write header");
 
-        //render
-        let final_vec = (0..self.img_height)
-            .into_par_iter()
-            .flat_map(|y| {
-                (0..self.img_width)
-                    .into_par_iter()
-                    .map(|x| {
-                        let mut pixel_color = Color::new();
-                        let mut rng = rand::thread_rng();
+        // find out how many threads are available
+        let available_threads = std::thread::available_parallelism()
+            .expect("Couldnt get number of available cores for parallelism")
+            .get();
 
-                        for _s in 0..self.samples_pr_pixel {
-                            let r = self.get_ray(x as f64, y as f64, &mut rng);
-                            pixel_color = pixel_color
-                                + Camera::par_ray_color(&r, world.clone(), self.max_light_bounces);
+        // the amount of pixelrows each thread is supposed to render
+        let chunk_size = self.img_height / available_threads as i64;
+
+        // Vector to store the pixels in
+        let pixel_results: Arc<Mutex<Vec<Option<Vec<_>>>>> =
+            Arc::new(Mutex::new(vec![None; available_threads]));
+
+        let new_self = Arc::new(self.clone());
+
+        // spawning threads and rendering
+        let handles: Vec<_> = (0..available_threads)
+            .into_iter()
+            .map(|i| {
+                let start = chunk_size * i as i64;
+                let end = if i - 1 != available_threads {
+                    chunk_size * (i + 1) as i64
+                } else {
+                    self.img_height
+                };
+
+                let arc_self = new_self.clone();
+                let arc_world = world.clone();
+                let pixels_clone = pixel_results.clone();
+
+                std::thread::spawn(move || {
+                    let mut rng = rand::thread_rng();
+
+                    let mut pixels = Vec::new();
+                    for y in start..end {
+                        for x in 0..arc_self.img_width {
+                            let mut pixel_color = Color::new();
+
+                            for _s in 0..arc_self.samples_pr_pixel {
+                                let r = arc_self.get_ray(x as f64, y as f64, &mut rng);
+                                pixel_color = pixel_color
+                                    + Camera::par_ray_color(
+                                        &r,
+                                        arc_world.to_owned(),
+                                        arc_self.max_light_bounces,
+                                    );
+                            }
+                            pixels.push(pixel_color);
                         }
-                        pixel_color
-                    })
-                    .collect::<Vec<Color>>()
+                    }
+
+                    pixels_clone.lock().expect("couldnt lock pixel_results")[i] = Some(pixels);
+                })
             })
-            .collect::<Vec<Color>>();
+            .collect();
+
+        for (_, handle) in handles.into_iter().enumerate() {
+            handle.join().expect("cant join thread");
+        }
+
+        let mut pixels = Vec::new();
+        for i in pixel_results
+            .lock()
+            .unwrap()
+            // .into_inner()
+            // .expect("couldnt get inner value of mutex")
+            .clone()
+        // .iter()
+        {
+            pixels.push(i);
+        }
+        let pixels: Vec<Color> = pixels.into_iter().flat_map(|i| i.unwrap()).collect();
 
         // write to file
-        for col in final_vec {
+        for col in pixels {
             file.write_all(
                 format!("\n{}", col.write_color(self.samples_pr_pixel as f64)).as_bytes(),
             )
@@ -230,7 +283,10 @@ impl Camera {
         for y in 0..self.img_height {
             // prints how many coloumns of pixels remain
             stderr
-                .write(format!("Scanlines remaining: {}\n", self.img_height - y).as_bytes())
+                .write(format!("\x1b[2K \x1b[0G").as_bytes())
+                .expect("couldnt clear terminal");
+            stderr
+                .write(format!("Scanlines remaining: {}", self.img_height - y).as_bytes())
                 .expect("cant write to stderr");
             stderr.flush().expect("couldnt flush stderr");
 
@@ -256,7 +312,7 @@ impl Camera {
             }
         }
 
-        println!("for loop ran: {} times", counter);
+        println!("\nFor loop ran: {} times", counter);
     }
 
     /// Set camera settings that aren't the default values

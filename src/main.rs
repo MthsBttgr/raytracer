@@ -1,6 +1,9 @@
 use std::io::BufWriter;
 use std::{fs, sync::Arc};
 
+#[macro_use]
+extern crate lazy_static;
+
 mod camera;
 mod hitable;
 mod material;
@@ -8,19 +11,23 @@ mod point3;
 mod ray;
 mod sphere;
 
-use camera::Camera;
 use material::Materials;
 use point3::{Color, Point3, Vec3};
 use ray::Ray;
 use sphere::Sphere;
 
+use crate::camera::Camera;
 use crate::hitable::Hitable;
 use crate::material::{Dielectric, Lambertian, Metal};
 
 fn main() {
     // Create the new file for the image to be written too
-    let mut file = BufWriter::new(
-        fs::File::create("Images/finalRenderPar3.ppm").expect("couldn't create file"),
+    let mut file1 = BufWriter::new(
+        fs::File::create("Images/finalNormalRender.ppm").expect("couldn't create file"),
+    );
+
+    let mut file2 = BufWriter::new(
+        fs::File::create("Images/finalRenderThreads.ppm").expect("couldn't create file"),
     );
 
     //world
@@ -92,18 +99,34 @@ fn main() {
     )));
 
     //3D camera
-    let mut camera = Camera::default();
-    camera.set_img_dimensions(16.0 / 9.0, 600);
-    camera.set_camera_settings(
-        Point3::from_xyz(13, 2, 3),
-        Point3::from_xyz(0, 0, 0),
-        20.0,
-        10,
-        10,
-        0.6,
-        10.0,
-    );
+    lazy_static! {
+        static ref CAMERA: Camera = {
+            let mut cam = Camera::default();
+            cam.set_img_dimensions(16.0 / 9.0, 600);
+            cam.set_camera_settings(
+                Point3::from_xyz(13, 2, 3),
+                Point3::from_xyz(0, 0, 0),
+                20.0,
+                10,
+                10,
+                0.6,
+                10.0,
+            );
+            cam
+        };
+    }
 
-    println!("Starting parralel render");
-    camera.par_render(&Arc::new(world), &mut file);
+    println!("starting normal render");
+    let instant = std::time::Instant::now();
+    CAMERA.render(&world, &mut file1);
+    let time = instant.elapsed();
+    println!("Time taken: {:#?}", time);
+
+    println!("starting render with threads");
+    let instant = std::time::Instant::now();
+    CAMERA.render_with_threads(Arc::new(world), &mut file2);
+    let time = instant.elapsed();
+    println!("Time taken: {:#?}", time);
+    // println!("Starting parralel render");
+    // camera.par_render(&Arc::new(world), &mut file);
 }
