@@ -7,3 +7,5 @@ The image format is .ppm, which isn't great, but very easy to work with.
 
 I followed the guide: "Raytracing in one weekend". Link: https://github.com/RayTracing/raytracing.github.io.
 I only completed the first book. I might return and do the others later, but right now i want to move on to other stuff.
+
+I tried to make it faster by adding my own multithreading aswell which went very well.
