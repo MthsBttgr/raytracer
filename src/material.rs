@@ -1,4 +1,7 @@
-use rand::{thread_rng, Rng};
+use rand::{
+    distributions::{Distribution, Standard},
+    thread_rng, Rng,
+};
 
 use crate::{
     hitable::HitRecord,
@@ -6,7 +9,34 @@ use crate::{
     ray::Ray,
 };
 
-pub trait Material {
+pub enum Materials {
+    Rough(Lambertian),
+    Reflective(Metal),
+    Glass(Dielectric),
+}
+
+impl Distribution<Materials> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Materials {
+        match rng.gen_range(0..=2) {
+            0 => Materials::Rough(Lambertian::from_color(Color::from_rgb(
+                rand::random::<f64>(),
+                rand::random::<f64>(),
+                rand::random::<f64>(),
+            ))),
+            1 => Materials::Reflective(Metal::from_color(
+                Color::from_rgb(
+                    rand::random::<f64>(),
+                    rand::random::<f64>(),
+                    rand::random::<f64>(),
+                ),
+                rand::random::<f64>() / 2.0,
+            )),
+            _ => Materials::Glass(Dielectric::from_ir(1.5)),
+        }
+    }
+}
+
+pub trait Material: Sync + Send {
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> Option<(Ray, Color)>;
 }
 
@@ -45,7 +75,7 @@ impl Material for Lambertian {
     }
 }
 
-/// Material for metal-like objects that reflect like
+/// Material for metal-like objects that reflect light
 #[derive(Clone, Copy)]
 pub struct Metal {
     albedo: Color,

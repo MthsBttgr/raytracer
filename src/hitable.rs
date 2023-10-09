@@ -1,16 +1,15 @@
 use crate::{material::Material, Point3, Ray, Vec3};
 
-pub trait Hitable {
+pub trait Hitable: Send + Sync {
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
 }
 
-//#[derive(Default, Clone)]
 /// Struct for keeping track info regarding ray intersections with objects
 pub struct HitRecord<'a> {
-    point: Point3,
-    normal: Vec3,
-    t: f64,
-    material: &'a dyn Material,
+    point: Point3,              //point of the intersection
+    normal: Vec3,               //The normal of the point
+    t: f64,                     // Distance from the camera to the point
+    material: &'a dyn Material, // The material of the object that was hit
 }
 
 impl<'a> HitRecord<'a> {
@@ -40,36 +39,19 @@ impl<'a> HitRecord<'a> {
         self.normal
     }
 
-    /// returns a refrence to the parameter used in the linear function to calculate intersections
+    /// returns a refrence to the distance between intersection and camera
     pub fn t(&self) -> f64 {
         self.t
     }
 }
 
-#[derive(Default)]
-pub struct HitableList {
-    list: Vec<Box<dyn Hitable>>,
-}
-
-impl HitableList {
-    /// Add an object to the scene to be rendered
-    pub fn add(&mut self, object: Box<dyn Hitable>) {
-        self.list.push(object);
-    }
-
-    /// clear the list of objects to be rendered
-    pub fn clear(&mut self) {
-        self.list.clear();
-    }
-}
-
-impl Hitable for HitableList {
-    /// Checks if the given ray hits any objects in the scene and returns the record of said hit
+/// Impl Hitable for list of hitable objects
+impl Hitable for Vec<Box<dyn Hitable>> {
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         let mut temp_rec = None;
         let mut closest_so_far = t_max;
 
-        for object in self.list.iter() {
+        for object in self.iter() {
             if let Some(hit) = object.hit(r, t_min, closest_so_far) {
                 closest_so_far = hit.t();
                 temp_rec = Some(hit);

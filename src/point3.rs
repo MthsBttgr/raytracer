@@ -1,5 +1,5 @@
+use rand::{rngs::ThreadRng, Rng};
 use std::ops::{Add, Div, Mul, Neg, Sub};
-use rand::{Rng};
 
 pub type Vec3 = Point3;
 
@@ -23,7 +23,11 @@ impl Point3 {
 
     /// Creates a new point at the given xyz coordinates
     pub fn from_xyz(x: impl Into<f64>, y: impl Into<f64>, z: impl Into<f64>) -> Self {
-        Self { x: x.into(), y: y.into(), z: z.into()}
+        Self {
+            x: x.into(),
+            y: y.into(),
+            z: z.into(),
+        }
     }
 
     /// returns x-coordinate
@@ -79,31 +83,46 @@ impl Point3 {
         *self / self.length()
     }
 
-    /// creates a random vec with random values from min to (but not including) max 
-    pub fn random_vec_from_to(min:f64, max:f64) -> Vec3{
+    /// creates a random vec with random values from min to (but not including) max
+    pub fn random_vec_from_to(min: f64, max: f64) -> Vec3 {
         let mut rng = rand::thread_rng();
         Self {
             x: rng.gen_range(min..max),
             y: rng.gen_range(min..max),
-            z: rng.gen_range(min..max)
+            z: rng.gen_range(min..max),
         }
     }
 
+    /// Gets a random vec inside a sphere with the radius of one
     pub fn random_vec_in_unit_sphere() -> Vec3 {
         loop {
             let p = Vec3::random_vec_from_to(-1.0, 1.0);
-            if p.length_squared() >= 1.0 {continue}
+            if p.length_squared() >= 1.0 {
+                continue;
+            }
             return p;
         }
     }
 
+    /// Gets a random unit vector
     pub fn random_unit_vec() -> Vec3 {
         Point3::random_vec_in_unit_sphere().unit_vec()
     }
 
+    /// Checks if Self is close to a null vec
     pub fn near_zero(&self) -> bool {
         let num = 1e-10;
         (self.x < num) && (self.y < num) && (self.z < num)
+    }
+
+    /// Generates a random 2 dimensional vector (z = 0) with a lenght less than one
+    pub fn random_in_unit_circle(rng: &mut ThreadRng) -> Vec3 {
+        loop {
+            let p = Vec3::from_xyz(rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0), 0);
+            if p.length_squared() < 1.0 {
+                return p;
+            }
+        }
     }
 }
 
@@ -210,8 +229,7 @@ impl PartialEq for Point3 {
 }
 
 impl Into<Color> for Point3 {
-    fn into(self) -> Color 
-    {
+    fn into(self) -> Color {
         Color::from_rgb(self.x, self.y, self.z)
     }
 }
@@ -220,16 +238,16 @@ impl Into<Color> for Point3 {
 pub struct Color {
     r: f64,
     g: f64,
-    b: f64
+    b: f64,
 }
 
 impl Color {
     /// creates new color that is completely black: r = 0, g = 0, b = 0.
     pub fn new() -> Color {
-        Color{
+        Color {
             r: 0.0,
             g: 0.0,
-            b: 0.0
+            b: 0.0,
         }
     }
 
@@ -247,19 +265,18 @@ impl Color {
 
     /// creates a new color from rgb values.
     /// The values should be between 0 and 1
-    pub fn from_rgb(r: impl Into<f64>, g: impl Into<f64>, b: impl Into<f64>) -> Color{
-        Color{
+    pub fn from_rgb(r: impl Into<f64>, g: impl Into<f64>, b: impl Into<f64>) -> Color {
+        Color {
             r: r.into(),
             g: g.into(),
-            b: b.into()
+            b: b.into(),
         }
     }
 
     /// Returns a string containing the color values of the color.
-    /// The values are scaled by 255.999 and rounded down. 
+    /// The values are scaled by 255.999 and rounded down.
     /// The string returned looks like this: "{r} {g} {b}", so just the color values and no "\n" or anything
     pub fn write_color(&self, samples_pr_pixel: f64) -> String {
-
         let mut r = self.r;
         let mut g = self.g;
         let mut b = self.b;
@@ -270,10 +287,12 @@ impl Color {
         g *= scale;
         b *= scale;
 
-        return format!("{} {} {}", 
-        (256.0 * clamp(r.sqrt(), 0.0, 0.999)) as i32, 
-        (256.0 * clamp(g.sqrt(), 0.0, 0.999)) as i32, 
-        (256.0 * clamp(b.sqrt(), 0.0, 0.999)) as i32);
+        return format!(
+            "{} {} {}",
+            (256.0 * clamp(r.sqrt(), 0.0, 0.999)) as i32,
+            (256.0 * clamp(g.sqrt(), 0.0, 0.999)) as i32,
+            (256.0 * clamp(b.sqrt(), 0.0, 0.999)) as i32
+        );
     }
 }
 
@@ -379,7 +398,11 @@ impl IsBetween for f64 {
 
 #[inline]
 fn clamp(num: f64, min: f64, max: f64) -> f64 {
-    if num < min {return min}
-    if num > max {return max}
+    if num < min {
+        return min;
+    }
+    if num > max {
+        return max;
+    }
     num
 }
