@@ -188,7 +188,7 @@ First of all the camera needs a placement and a point to look at. It also needs 
         let v = w.cross_product(&u);
 ```
 ![image](https://github.com/MthsBttgr/raytracer/assets/94607744/44eeee11-a663-4d23-be5f-53aafee9bd3a)
-(Technically, at this stage the virtual camera is a perfect square, and a rectangle as shown in the illustration. However, it was easier to illustrate the u, v, and w vectors from a rectangular virtual camera)
+(Technically, at this stage the virtual camera is a perfect square, and not a rectangle as shown in the illustration. However, it was easier to illustrate the u, v, and w vectors from a rectangular virtual camera)
 
 Now we need to shape the the camera. We need an aspect ratio, the ratio between the width of the camera, and the height. I have gone with a classic 16:9 aspect ratio, though this is easy to change. From this aspect ratio we can calculate the amount of vertical pixels from the amount of horizontal pixels and vice versa. 
 
