@@ -51,3 +51,5 @@ We can insert the formula for a ray into this equation instead of the P, the poi
 ```math
 ((\vec{A} + t \cdot \vec{B}) - C)^2 = r^2
 ```
+
+To be continued ...
