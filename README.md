@@ -175,6 +175,8 @@ A normal is an unit vector that stands perpendicular on a surface. From the norm
 But before we can even view the scene we need a place to view it from: The camera. The camera emulates a real world camera, the only major difference being that the virtual camera sends out rays and a real one collects them. It is in the camera where we decide all the settings of the picture. How big the resolution is, aspect ratio, focus (called defocus_blur in the code), placement, and more. 
 
 ### Defining the camera 
+This section might be slightly confusing and maybe a bit all over the place. There are a bunch of things we need to simulate a virtual camera, and many of them interact to create other things we need. I will use a bunch of terms and do my best to explain them, but it might be hard to follow none the less.
+
 First of all the camera needs a placement and a point to look at. It also needs a rotation, but currently im just saying that it is always horizontal. From this information we can generate 3 vectors that we use to define our camera in virtual space.
 ```rust 
         // Camera positioning
@@ -185,11 +187,56 @@ First of all the camera needs a placement and a point to look at. It also needs 
         // Camera basic vectors
         let w = (look_from - look_at).unit_vec();
         let u = vup.cross_product(&w).unit_vec();
-        let v = w.cross_product(&u);
+        let v = u.cross_product(&w);
 ```
-![image](https://github.com/MthsBttgr/raytracer/assets/94607744/44eeee11-a663-4d23-be5f-53aafee9bd3a)
-(Technically, at this stage the virtual camera is a perfect square, and not a rectangle as shown in the illustration. However, it was easier to illustrate the u, v, and w vectors from a rectangular virtual camera)
+![image](https://github.com/MthsBttgr/raytracer/assets/94607744/0ae326e8-88ed-4643-aae8-f2f9afc42104)
+(Technically, at this stage the virtual camera is a perfect unit square, and not a rectangle as shown in the illustration. However, it was easier to illustrate the u, v, and w vectors from a rectangular virtual camera)
 
-Now we need to shape the the camera. We need an aspect ratio, the ratio between the width of the camera, and the height. I have gone with a classic 16:9 aspect ratio, though this is easy to change. From this aspect ratio we can calculate the amount of vertical pixels from the amount of horizontal pixels and vice versa. 
+The u and v vectors are used to define our "image plane". This is where we will later lay out all the pixels. The w vector points towards the camera origin. The distance from the camera origin to the image plane is called the focal distance. In my program the focal distance is the same as the focus distance, which is the distance from the camera sensor too where everything is in perfect focus. That means the image plane is where everything is in perfect focus. In a real world camera, the focal distance and focus distance are obviously very different, because the lense can't extend to the object it is focusing on, but in the virtual world we aren't limited by what is physically impossible.
+
+Now we need to "shape" the the camera. We need an aspect ratio ie. the ratio between the width of the camera and the height. I have gone with a classic 16:9 aspect ratio, though this is easy to change. From the aspect ratio we can calculate the amount of vertical pixels from the amount of horizontal pixels and vice versa. The aspect ratio will come into further use a little later.
+
+Field of view, fov, describes the visual angle from edge to edge. Basically how much we can see. A small fov makes it so we can only see a small part of the scene, giving the effect that the camera is zoomed in, and a large fov gives the reverse effect. The fov is different depending on whether you are measuring from the top and bottom edges of the view plane or the left and right edges. I am using vertical fov, vfov, in the program ie. the angle between the top and bottom edges. I define it in degrees, but convert it too radians in the program. From the vfov we can shape the camera, because we can figure out the virtual height of the camera, and from that height we can get the width from the aspect ratio. 
+![image](https://github.com/MthsBttgr/raytracer/assets/94607744/e4d66b7e-87b8-4a1e-8149-820475b62b05)
+h is equal to half the height of the camera. h is luckily easy to calculate with just a bit of trigonomitri:
+```math 
+h = \tan{({vfov \over 2})} \cdot focusDistance
+```
+```math 
+cameraHeight = 2h
+```
+From there it is easy to calculate the width aswell:
+```math 
+cameraWidth = aspectRatio \cdot viewportHeight
+```
+And that ends up looking like this in the code:
+```rust
+        // image dimensions
+        let aspect_ratio = 16.0 / 9.0;
+        let img_width = 400;                                                // Horizontal pixel count
+        let img_height = (img_width as f64 / aspect_ratio) as i64;          // Vertical pixel count
+
+
+        // Viewport dimensions:
+        let vfov = 90.0;
+        let theta = Camera::degrees_to_radians(vfov);
+        let h = (theta / 2.0).tan();
+        let viewport_height = 2.0 * h * focus_distance;                    // The virtual camera is called the viewport in the code
+        let viewport_width = viewport_height * aspect_ratio;
+
+```
+(I also define the image resolution here ie. how many horizontal pixels and how many vertical pixels
+
+Now, if we take these values and multiply by our camera vectors, v and u, we get the shape of the camera we want, because we can use this information to lay out the pixel grid. Think of each pixel as a tiny square, and a bounch of these squares are laid out over the image plane. We can find the distance between the center of each pixel by dividing the width and height of our virtual camera by the amount of horizontal and vertical pixels. With that info we can find the center of the top-left pixel, pixel_00_loc, which will be our starting point when rendering the picture, which i will explain what is in a bit. 
+```rust 
+        let viewport_u = u * viewport_width;
+        let viewport_v = v * viewport_height;
+        let pixel_delta_u = viewport_u / img_width as f64;
+        let pixel_delta_v = viewport_v / img_height as f64;
+        let upper_left = look_from - (w * focus_distance) - viewport_u / 2.0 - viewport_v / 2.0;
+        let pixel_00_loc = upper_left + (pixel_delta_v + pixel_delta_u) * 0.5;
+```
+![image](https://github.com/MthsBttgr/raytracer/assets/94607744/94df31ee-8097-4156-b34b-9a0de4216668)
+
 
 ...to be continued...
