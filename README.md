@@ -207,7 +207,7 @@ cameraHeight = 2h
 ```
 From there it is easy to calculate the width aswell:
 ```math 
-cameraWidth = aspectRatio \cdot viewportHeight
+cameraWidth = aspectRatio \cdot cameraHeight
 ```
 And that ends up looking like this in the code:
 ```rust
@@ -238,5 +238,8 @@ Now, if we take these values and multiply by our camera vectors, v and u, we get
 ```
 ![image](https://github.com/MthsBttgr/raytracer/assets/94607744/94df31ee-8097-4156-b34b-9a0de4216668)
 
+That is basically it for the camera. There are a few more variables that are stored in the camera, the samples per pixel and the maximum number of light bounces. These are fairly simpel, but I think it will be easier to explain it in the context of rendering the image, where they are used. Other than those the camera also stores some parameters used for bluring the parts of the image that is out of focus. I think that is easier to explain after explaining how a picture is renderes aswell.
+
+## Rendering
 
 ...to be continued...
