@@ -194,18 +194,15 @@ First of all the camera needs a placement and a point to look at. It also needs 
 
 The u and v vectors are used to define our "image plane". This is where we will later lay out all the pixels. The w vector points towards the camera origin. The distance from the camera origin to the image plane is called the focal distance. In my program the focal distance is the same as the focus distance, which is the distance from the camera sensor too where everything is in perfect focus. That means the image plane is where everything is in perfect focus. In a real world camera, the focal distance and focus distance are obviously very different, because the lense can't extend to the object it is focusing on, but in the virtual world we aren't limited by what is physically impossible.
 
-Now we need to "shape" the the camera. We need an aspect ratio ie. the ratio between the width of the camera and the height. I have gone with a classic 16:9 aspect ratio, though this is easy to change. From the aspect ratio we can calculate the amount of vertical pixels from the amount of horizontal pixels and vice versa. The aspect ratio will come into further use a little later.
-
-Field of view, fov, describes the visual angle from edge to edge. Basically how much we can see. A small fov makes it so we can only see a small part of the scene, giving the effect that the camera is zoomed in, and a large fov gives the reverse effect. The fov is different depending on whether you are measuring from the top and bottom edges of the view plane or the left and right edges. I am using vertical fov, vfov, in the program ie. the angle between the top and bottom edges. I define it in degrees, but convert it too radians in the program. From the vfov we can shape the camera, because we can figure out the virtual height of the camera, and from that height we can get the width from the aspect ratio. 
+Now we need to "shape" the the camera. For this we need an aspect ratio ie. the ratio between the width of the camera and the height, and the field of view. I have gone with a classic 16:9 aspect ratio, though this is easy to change. Field of view, fov, describes the visual angle from edge to edge. Basically how much we can see. A small fov makes it so we can only see a small part of the scene, giving the effect that the camera is zoomed in, and a large fov gives the reverse effect. The fov is different depending on whether you are measuring from the top and bottom edges of the view plane or the left and right edges. I am using vertical fov, vfov, in the program ie. the angle between the top and bottom edges. Now, through a bit of math we can "shape" the camera:
 ![image](https://github.com/MthsBttgr/raytracer/assets/94607744/e4d66b7e-87b8-4a1e-8149-820475b62b05)
-h is equal to half the height of the camera. h is luckily easy to calculate with just a bit of trigonomitri:
+h is equal to half the height of the camera. h is easy to calculate with just a bit of trigonomitri:
 ```math 
 h = \tan{({vfov \over 2})} \cdot focusDistance
 ```
 ```math 
 cameraHeight = 2h
 ```
-From there it is easy to calculate the width aswell:
 ```math 
 cameraWidth = aspectRatio \cdot cameraHeight
 ```
@@ -219,15 +216,15 @@ And that ends up looking like this in the code:
 
         // Viewport dimensions:
         let vfov = 90.0;
-        let theta = Camera::degrees_to_radians(vfov);
+        let theta = Camera::degrees_to_radians(vfov);                      // Changing the angle from degrees to radians
         let h = (theta / 2.0).tan();
         let viewport_height = 2.0 * h * focus_distance;                    // The virtual camera is called the viewport in the code
         let viewport_width = viewport_height * aspect_ratio;
 
 ```
-(I also define the image resolution here ie. how many horizontal pixels and how many vertical pixels
+(I also define the image resolution here ie. how many horizontal pixels and how many vertical pixels)
 
-Now, if we take these values and multiply by our camera vectors, v and u, we get the shape of the camera we want, because we can use this information to lay out the pixel grid. Think of each pixel as a tiny square, and a bounch of these squares are laid out over the image plane. We can find the distance between the center of each pixel by dividing the width and height of our virtual camera by the amount of horizontal and vertical pixels. With that info we can find the center of the top-left pixel, pixel_00_loc, which will be our starting point when rendering the picture, which i will explain what is in a bit. 
+Now, if we take these values and multiply by our camera vectors, v and u, we get the shape of the camera we want. We can use this information to lay out the pixel grid. Think of each pixel as a tiny square, and a bunch of these squares are laid out over the image plane. Through some simple math we find the distance between the center of each pixel, aswell as the location of the top-left pixel, pixel_00_loc, which will be our starting point when rendering the picture, which i will explain what is in a bit. 
 ```rust 
         let viewport_u = u * viewport_width;
         let viewport_v = v * viewport_height;
@@ -238,8 +235,30 @@ Now, if we take these values and multiply by our camera vectors, v and u, we get
 ```
 ![image](https://github.com/MthsBttgr/raytracer/assets/94607744/94df31ee-8097-4156-b34b-9a0de4216668)
 
-That is basically it for the camera. There are a few more variables that are stored in the camera, the samples per pixel and the maximum number of light bounces. These are fairly simpel, but I think it will be easier to explain it in the context of rendering the image, where they are used. Other than those the camera also stores some parameters used for bluring the parts of the image that is out of focus. I think that is easier to explain after explaining how a picture is renderes aswell.
+There are a few more variables that are stored in the camera, the samples per pixel and the maximum number of light bounces. These are fairly simpel, but I think it will be easier to explain it in the context of rendering the image, where they are used. The camera also stores some variables used for bluring the parts of the image that is out of focus. I think that is easier to explain after explaining how a picture is renderes aswell.
 
 ## Rendering
+The idea behind rendering the image is simple. It is the process of actually sending out rays, recording their color, and creating the image file. I will explain this process iterativly, slowly getting more complex as more elements are added to this process. First let's look at some code:
+```rust
+    pub fn render<T: Hitable>(&self, world: &T, file: &mut BufWriter<File>) {
+        //writing header to image file
+        file.write_all(format!("P3\n{} {}\n255\n", self.img_width, self.img_height).as_bytes())
+            .expect("couldnt write header");
+
+        // loop through each pixel
+        for y in 0..self.img_height {
+            for x in 0..self.img_width {
+                // create a ray that goes from the camera origin through the given pixel center
+                let r: Ray = self.get_ray(x as f64, y as f64);
+                // Simulate light bouncing through the scene and record the color
+                let pixel_color: Color = Camera::ray_color(&r, world, self.max_light_bounces);    // the world parameter is just a list of every object in the scene that the rays can collide with.
+
+                // Write the pixel color to the image file
+                file.write_all(format!("\n{}", pixel_color.write_color(self.samples_pr_pixel as f64)).as_bytes(),)
+                    .expect("couldnt write all");
+            }
+        }
+    }
+```
 
 ...to be continued...
